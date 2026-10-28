@@ -411,26 +411,12 @@ fn any_owner_opens_the_gate_and_the_one_who_plays_brings_the_session() {
 }
 
 #[test]
-fn offline_names_play_only_beside_an_owner() {
+fn offline_names_play_without_an_owner() {
     let store = MemoryStore::default();
     let mut accounts = Accounts::default();
-    let refused = accounts.play_as(&store, Player::Offline("Builder_1".into()));
-    assert_eq!(refused.unwrap_err(), OFFLINE_NEEDS_OWNER);
-    assert!(accounts.offline.is_empty());
-    let mut accounts = signed_in(&store, &secrets("mc-token", true));
-    accounts
-        .play_as(&store, Player::Offline("Builder_1".into()))
-        .unwrap();
-    // Signing the last owner out keeps the name, which no longer plays.
-    accounts.remove(&store, UUID).unwrap();
-    assert_eq!(accounts.offline, ["Builder_1"]);
+    accounts.play_as(&store, Player::Offline("Builder_1".into())).unwrap();
     assert_eq!(accounts.player(), Player::Offline("Builder_1".into()));
     assert!(!accounts.has_owner(&store));
-    let (_, ep) = mock(|_| {});
-    assert!(launch(&ep, Some("test-client"), &store, &mut accounts).is_err());
-    assert!(accounts
-        .play_as(&store, Player::Offline("Builder_2".into()))
-        .is_err());
 }
 
 #[test]

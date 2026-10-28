@@ -99,7 +99,7 @@ enum AccountCmd {
     },
     /// Play as this account, or as one of your offline names
     Select { who: String },
-    /// Play offline (LAN, offline-mode servers) beside a signed-in account that owns the game:
+    /// Play offline (LAN and offline-mode servers):
     /// as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game
     /// made up
     Offline { name: Option<String> },
@@ -1465,9 +1465,6 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                     println!(
                         "Playing offline as the game's own name (`account select NAME` to switch)."
                     );
-                }
-                if !accounts.has_owner(account::store()) {
-                    println!("{}.", account::NEEDS_OWNER);
                 }
             }
         }

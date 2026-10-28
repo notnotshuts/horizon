@@ -5,9 +5,8 @@
 //! reads once (`--session-file`), never on its command line. Tokens never reach logs, errors or
 //! output.
 //!
-//! The owner gate ([`launch`]): the launcher starts the game only while an account in it owns
-//! Minecraft: Java Edition, as other launchers do. Offline names play behind such an account.
-//! The game binary itself, its harnesses and the servers don't go through the launcher's gate.
+//! The ownership check ([`launch`]) authorizes downloads from Mojang. The game can also
+//! launch offline using resources prepared from the player's own installation.
 //!
 //! The Azure app (client ID) is Horizon's own and is configuration: `HORIZON_MSA_CLIENT_ID` at
 //! build time, or at run time to override it. Without one, sign-in says it is not configured.
@@ -784,9 +783,6 @@ pub enum Player {
     GameName,
 }
 
-const OFFLINE_NEEDS_OWNER: &str =
-    "Offline names need a Microsoft account that owns Minecraft: Java Edition in the launcher.";
-
 /// The secrets an account keeps in `store`, if it still has them there.
 fn secrets_in(store: &dyn SecretStore, uuid: &str) -> Option<Secrets> {
     store
@@ -866,9 +862,8 @@ impl Accounts {
         }
     }
 
-    /// Plays as `who`: an account, an offline name (kept, only beside an account that owns the
-    /// game), or the game's own name.
-    pub fn play_as(&mut self, store: &dyn SecretStore, who: Player) -> Result<(), String> {
+    /// Plays as `who`: an account, a saved offline name, or the game's own name.
+    pub fn play_as(&mut self, _store: &dyn SecretStore, who: Player) -> Result<(), String> {
         match who {
             Player::Microsoft(uuid) => {
                 if !self.accounts.iter().any(|a| a.uuid == uuid) {
@@ -877,9 +872,6 @@ impl Accounts {
                 self.selected = Some(uuid);
             }
             Player::Offline(name) => {
-                if !self.has_owner(store) {
-                    return Err(OFFLINE_NEEDS_OWNER.into());
-                }
                 let name = self.add_offline(&name)?;
                 self.selected = None;
                 self.offline_selected = Some(name);
@@ -1144,8 +1136,7 @@ impl SignIn {
     }
 }
 
-/// The owner gate for the game about to start, then the selected account's session in a file
-/// for it: the file (none: offline) and why the account plays offline this time, if it does.
+/// Write the selected account's session for the game when available, otherwise play offline.
 pub fn session_for_game(game_home: &Path) -> Result<(Option<PathBuf>, Option<String>), NoOwner> {
     let mut accounts = Accounts::load();
     let pass = launch(
@@ -1153,7 +1144,7 @@ pub fn session_for_game(game_home: &Path) -> Result<(Option<PathBuf>, Option<Str
         client_id().as_deref(),
         store(),
         &mut accounts,
-    )?;
+    ).unwrap_or_default();
     let _ = accounts.save();
     let Some((account, secrets)) = pass.session else {
         return Ok((None, pass.offline));
