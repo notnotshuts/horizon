@@ -414,7 +414,9 @@ fn any_owner_opens_the_gate_and_the_one_who_plays_brings_the_session() {
 fn offline_names_play_without_an_owner() {
     let store = MemoryStore::default();
     let mut accounts = Accounts::default();
-    accounts.play_as(&store, Player::Offline("Builder_1".into())).unwrap();
+    accounts
+        .play_as(&store, Player::Offline("Builder_1".into()))
+        .unwrap();
     assert_eq!(accounts.player(), Player::Offline("Builder_1".into()));
     assert!(!accounts.has_owner(&store));
 }

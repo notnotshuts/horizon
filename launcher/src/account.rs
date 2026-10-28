@@ -1144,7 +1144,8 @@ pub fn session_for_game(game_home: &Path) -> Result<(Option<PathBuf>, Option<Str
         client_id().as_deref(),
         store(),
         &mut accounts,
-    ).unwrap_or_default();
+    )
+    .unwrap_or_default();
     let _ = accounts.save();
     let Some((account, secrets)) = pass.session else {
         return Ok((None, pass.offline));
