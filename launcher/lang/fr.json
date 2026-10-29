@@ -176,7 +176,7 @@
   "From my install": "Depuis mon installation",
   "Download and prepare": "Télécharger et préparer",
   "Not prepared. Horizon can download Minecraft {version} from Mojang for your account, or use your own install.": "Pas préparé. Horizon peut télécharger Minecraft {version} depuis Mojang pour votre compte, ou utiliser votre propre installation.",
-  "Not prepared. Sign in with the Microsoft account that owns Minecraft {version} first.": "Pas préparé. Connectez-vous d'abord avec le compte Microsoft qui possède Minecraft {version}.",
+  "Not prepared. Choose your own Minecraft {version} folder to prepare resources.": "Non préparé. Choisissez votre dossier Minecraft {version} pour préparer les ressources.",
   "Cancel": "Annuler",
   "Native mods (experimental)": "Mods natifs (expérimental)",
   "Native mods from the Mods page compile into the game with the launcher's own Rust. Not sandboxed: they can do anything you can on this computer.": "Les mods natifs de la page Mods sont compilés dans le jeu avec le Rust du launcher. Sans bac à sable : ils peuvent faire tout ce que vous pouvez faire sur cet ordinateur.",

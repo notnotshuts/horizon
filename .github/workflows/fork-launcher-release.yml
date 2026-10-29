@@ -1,0 +1,154 @@
+name: Fork launcher release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'launcher/**'
+      - 'crates/horizon-bench/**'
+      - 'crates/horizon-friends/**'
+      - 'crates/horizon-mods/**'
+      - 'crates/horizon-port-pack/**'
+      - 'crates/horizon-prepare/**'
+      - 'crates/horizon-release-sign/**'
+      - 'crates/horizon-telemetry/**'
+      - 'crates/horizon-theme/**'
+      - 'packaging/macos/**'
+      - '.github/workflows/fork-launcher-release.yml'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Sync upstream]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-launcher-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.repository == 'notnotshuts/horizon' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      head: ${{ steps.commit.outputs.head }}
+      build: ${{ steps.commit.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.sha }}
+          fetch-depth: 0
+      - id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          head=$(git rev-parse HEAD)
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          previous=$(gh release list --limit 100 --json tagName --jq '.[].tagName | select(startswith("fork-launcher-"))' | head -1)
+          old=$(git rev-list -n 1 "$previous" 2>/dev/null || true)
+          if [[ "$EVENT" == workflow_run && "$head" == "$old" ]]; then
+            echo 'build=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true' && github.repository == 'notnotshuts/horizon' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: linux-x86_64
+            binary: horizon-launcher
+          - os: windows-latest
+            name: windows-x64
+            binary: horizon-launcher.exe
+            rustflags: -C target-feature=+crt-static
+          - os: macos-14
+            name: macos-arm64
+            binary: horizon-launcher
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      HORIZON_FORK_BUILD: '1'
+      HORIZON_TELEMETRY_URL: 'off'
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher
+          shared-key: fork-launcher-${{ matrix.name }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig-dev libvulkan-dev libasound2-dev
+      - name: Use runtime shaders when Metal compiler is unavailable
+        if: runner.os == 'macOS'
+        run: |
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            echo 'LAUNCHER_FEATURES=gpui/runtime_shaders' >> "$GITHUB_ENV"
+          fi
+      - name: Test and build
+        run: |
+          cargo test --release --locked ${LAUNCHER_FEATURES:+--features "$LAUNCHER_FEATURES"}
+          cargo build --release --locked ${LAUNCHER_FEATURES:+--features "$LAUNCHER_FEATURES"}
+      - name: Package
+        run: |
+          mkdir -p out
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            python3 -m venv "$RUNNER_TEMP/dmg"
+            "$RUNNER_TEMP/dmg/bin/pip" install dmgbuild==1.6.5
+            version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+            DMGBUILD="$RUNNER_TEMP/dmg/bin/dmgbuild" ../packaging/macos/package.sh "target/release/${{ matrix.binary }}" "$version" out
+            rm -rf out/Horizon.app
+          elif [[ "$RUNNER_OS" == Windows ]]; then
+            (cd target/release && 7z a "../../out/horizon-launcher-${{ matrix.name }}.zip" '${{ matrix.binary }}')
+          else
+            tar -C target/release -czf "out/horizon-launcher-${{ matrix.name }}.tar.gz" '${{ matrix.binary }}'
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-${{ matrix.name }}
+          path: launcher/out/*
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: launcher-*
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ID: ${{ github.run_id }}
+          SHA: ${{ needs.plan.outputs.head }}
+        run: |
+          cd dist
+          sha256sum horizon-launcher-* > SHA256SUMS
+          tag="fork-launcher-${RUN_NUMBER}"
+          gh release create "$tag" --repo "$REPO" --target "$SHA" --title "Fork launcher build ${RUN_NUMBER}" --latest=false \
+            --notes "Automated launcher build. See Actions run ${RUN_ID} for the source and build logs. macOS build is ad-hoc signed and not notarized. Launcher self-update is disabled for this fork; download updates from Releases. Requires resources from your own Minecraft installation." \
+            horizon-launcher-* SHA256SUMS

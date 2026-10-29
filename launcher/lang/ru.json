@@ -176,7 +176,7 @@
   "From my install": "Из моей установки",
   "Download and prepare": "Скачать и подготовить",
   "Not prepared. Horizon can download Minecraft {version} from Mojang for your account, or use your own install.": "Не подготовлено. Horizon может скачать Minecraft {version} у Mojang для вашего аккаунта или взять вашу установку.",
-  "Not prepared. Sign in with the Microsoft account that owns Minecraft {version} first.": "Не подготовлено. Сначала войдите в аккаунт Microsoft, у которого есть Minecraft {version}.",
+  "Not prepared. Choose your own Minecraft {version} folder to prepare resources.": "Не подготовлено. Выберите папку своей установки Minecraft {version}, чтобы подготовить ресурсы.",
   "Cancel": "Отмена",
   "Native mods (experimental)": "Нативные моды (экспериментально)",
   "Native mods from the Mods page compile into the game with the launcher's own Rust. Not sandboxed: they can do anything you can on this computer.": "Нативные моды со страницы «Моды» компилируются в игру собственным Rust лаунчера. Без песочницы: они могут делать на этом компьютере всё, что можете вы.",
